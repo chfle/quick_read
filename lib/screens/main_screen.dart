@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quick_read/screens/homescreen.dart';
 import 'package:quick_read/screens/settings_screen.dart';
 
 // Import your widgets here
@@ -20,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
 
   // Placeholder screens - replace with actual screens later
   final List<Widget> _screens = [
-    const HomeScreenPlaceholder(),
+    const HomeScreen(),
     const BookmarksScreenPlaceholder(),
     const HistoryScreenPlaceholder(),
     const SettingsScreen(),
@@ -90,43 +91,7 @@ class _MainScreenState extends State<MainScreen> {
 
 // Placeholder screens - these will be replaced with actual screens
 
-class HomeScreenPlaceholder extends StatelessWidget {
-  const HomeScreenPlaceholder({Key? key}) : super(key: key);
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('News Feed'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.newspaper, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Home Screen',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'News feed will appear here',
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class BookmarksScreenPlaceholder extends StatelessWidget {
   const BookmarksScreenPlaceholder({Key? key}) : super(key: key);

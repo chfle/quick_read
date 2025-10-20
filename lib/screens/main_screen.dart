@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quick_read/screens/bookmark_screen.dart';
+import 'package:quick_read/screens/history_screen.dart';
 import 'package:quick_read/screens/homescreen.dart';
 import 'package:quick_read/screens/settings_screen.dart';
 
@@ -24,7 +25,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const HomeScreen(),
     const BookmarksScreen(),
-    const HistoryScreenPlaceholder(),
+    const HistoryScreen(),
     const SettingsScreen(),
   ];
 
@@ -91,76 +92,3 @@ class _MainScreenState extends State<MainScreen> {
 }
 
 // Placeholder screens - these will be replaced with actual screens
-
-
-class HistoryScreenPlaceholder extends StatelessWidget {
-  const HistoryScreenPlaceholder({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Reading History'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.history, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Reading History',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Your reading history will appear here',
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Settings'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.settings, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Settings',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'App settings will appear here',
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }

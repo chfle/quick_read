@@ -1,0 +1,117 @@
+// repositories/user_repository.dart
+import '../database/database_helper.dart';
+import '../models/user_model.dart';
+
+class UserRepository {
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
+
+  // Create new user (Register)
+  Future<bool> registerUser({
+    required String username,
+    required String password,
+    List<String> favoriteCategories = const [],
+  }) async {
+    try {
+      // Check if user already exists
+      final existingUser = await _dbHelper.getUser(username);
+      if (existingUser != null) {
+        throw Exception('Username already exists');
+      }
+
+      final user = UserModel(
+        username: username,
+        password: password,
+        favoriteCategories: favoriteCategories.isEmpty
+            ? ['general', 'technology']
+            : favoriteCategories,
+      );
+
+      await _dbHelper.createUser(user.toMap());
+      return true;
+    } catch (e) {
+      throw Exception('Failed to register user: $e');
+    }
+  }
+
+  // Login user
+  Future<UserModel?> loginUser({
+    required String username,
+    required String password,
+  }) async {
+    try {
+      final userMap = await _dbHelper.getUser(username);
+
+      if (userMap == null) {
+        throw Exception('User not found');
+      }
+
+      final user = UserModel.fromMap(userMap);
+
+      // Simple password check (in production, use proper hashing)
+      if (user.password != password) {
+        throw Exception('Invalid password');
+      }
+
+      return user;
+    } catch (e) {
+      throw Exception('Login failed: $e');
+    }
+  }
+
+  // Get user by username
+  Future<UserModel?> getUser(String username) async {
+    try {
+      final userMap = await _dbHelper.getUser(username);
+      if (userMap != null) {
+        return UserModel.fromMap(userMap);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Failed to get user: $e');
+    }
+  }
+
+  // Update user's favorite categories
+  Future<void> updateFavoriteCategories({
+    required int userId,
+    required List<String> categories,
+  }) async {
+    try {
+      final userMap = await _dbHelper.getUser(''); // Need to get by ID
+      if (userMap != null) {
+        final user = UserModel.fromMap(userMap);
+        final updatedUser = UserModel(
+          id: user.id,
+          username: user.username,
+          password: user.password,
+          favoriteCategories: categories,
+          createdAt: user.createdAt,
+        );
+        await _dbHelper.updateUser(userId, updatedUser.toMap());
+      }
+    } catch (e) {
+      throw Exception('Failed to update categories: $e');
+    }
+  }
+
+  // Update entire user
+  Future<void> updateUser(UserModel user) async {
+    try {
+      if (user.id != null) {
+        await _dbHelper.updateUser(user.id!, user.toMap());
+      }
+    } catch (e) {
+      throw Exception('Failed to update user: $e');
+    }
+  }
+
+  // Check if username exists
+  Future<bool> usernameExists(String username) async {
+    try {
+      final userMap = await _dbHelper.getUser(username);
+      return userMap != null;
+    } catch (e) {
+      return false;
+    }
+  }
+}

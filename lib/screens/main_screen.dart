@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quick_read/screens/settings_screen.dart';
 
 // Import your widgets here
 // import 'widgets/bottom_nav_bar_widget.dart';
@@ -22,7 +23,7 @@ class _MainScreenState extends State<MainScreen> {
     const HomeScreenPlaceholder(),
     const BookmarksScreenPlaceholder(),
     const HistoryScreenPlaceholder(),
-    const SettingsScreenPlaceholder(),
+    const SettingsScreen(),
   ];
 
   void _onTabTapped(int index) {
@@ -203,9 +204,6 @@ class HistoryScreenPlaceholder extends StatelessWidget {
   }
 }
 
-class SettingsScreenPlaceholder extends StatelessWidget {
-  const SettingsScreenPlaceholder({Key? key}) : super(key: key);
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -239,4 +237,3 @@ class SettingsScreenPlaceholder extends StatelessWidget {
       ),
     );
   }
-}

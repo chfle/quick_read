@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:quick_read/screens/bookmark_screen.dart';
 import 'package:quick_read/screens/homescreen.dart';
 import 'package:quick_read/screens/settings_screen.dart';
 
@@ -22,7 +23,7 @@ class _MainScreenState extends State<MainScreen> {
   // Placeholder screens - replace with actual screens later
   final List<Widget> _screens = [
     const HomeScreen(),
-    const BookmarksScreenPlaceholder(),
+    const BookmarksScreen(),
     const HistoryScreenPlaceholder(),
     const SettingsScreen(),
   ];
@@ -91,45 +92,6 @@ class _MainScreenState extends State<MainScreen> {
 
 // Placeholder screens - these will be replaced with actual screens
 
-
-
-class BookmarksScreenPlaceholder extends StatelessWidget {
-  const BookmarksScreenPlaceholder({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Bookmarks'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.bookmark, size: 80, color: Colors.grey[300]),
-            const SizedBox(height: 16),
-            Text(
-              'Bookmarks',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey[600],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Saved articles will appear here',
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class HistoryScreenPlaceholder extends StatelessWidget {
   const HistoryScreenPlaceholder({Key? key}) : super(key: key);

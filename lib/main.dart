@@ -1,7 +1,31 @@
 import 'package:flutter/material.dart';
-import 'screens/main_screen.dart';
+import 'package:flutter/foundation.dart';
+import 'package:sqflite/sqflite.dart';
+import 'package:sqflite_common_ffi/sqflite_ffi.dart';
+import 'dart:io';
+import 'database/database_helper.dart';
+import 'screens/login_screen.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Initialize sqflite for desktop platforms
+  if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
+    // Initialize FFI
+    sqfliteFfiInit();
+    // Change the default factory
+    databaseFactory = databaseFactoryFfi;
+    print('Using sqflite FFI for desktop platform');
+  }
+  
+  // Initialize the database
+  try {
+    await DatabaseHelper.instance.initialize();
+    print('Database initialized successfully');
+  } catch (e) {
+    print('Database initialization error: $e');
+  }
+  
   runApp(const MyApp());
 }
 
@@ -11,12 +35,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'News Aggregator',
+      title: 'Quick Read - News App',
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: const LoginScreen(),
     );
   }
 }

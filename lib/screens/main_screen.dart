@@ -90,5 +90,3 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 }
-
-// Placeholder screens - these will be replaced with actual screens

@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-
+import '../database/database_helper.dart';
+import '../models/bookmark_model.dart';
+import '../models/article_model.dart';
+import 'article_detail_screen.dart';
 
 class BookmarksScreen extends StatefulWidget {
   const BookmarksScreen({Key? key}) : super(key: key);
@@ -9,12 +12,13 @@ class BookmarksScreen extends StatefulWidget {
 }
 
 class _BookmarksScreenState extends State<BookmarksScreen> {
-  // final NewsRepository _newsRepository = NewsRepository();
+  final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
   
-  List<dynamic> _bookmarks = []; // Replace with List<BookmarkModel>
+  List<BookmarkModel> _bookmarks = [];
   bool _isLoading = false;
   bool _isSelectionMode = false;
   final Set<int> _selectedIndices = {};
+  String _sortBy = 'recent'; // recent, date, title
 
   @override
   void initState() {
@@ -28,26 +32,16 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     });
 
     try {
-      // TODO: Uncomment when repository is connected
-      // final bookmarks = await _newsRepository.getBookmarks();
-      
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Mock bookmarks
-      final mockBookmarks = List.generate(8, (index) => {
-        'id': index,
-        'articleId': 'article_$index',
-        'title': 'Bookmarked Article ${index + 1}: This is a saved news story',
-        'description': 'Description for bookmarked article ${index + 1}',
-        'source': 'News Source ${index % 3 + 1}',
-        'publishedAt': DateTime.now().subtract(Duration(days: index)).toIso8601String(),
-        'imageUrl': index % 3 != 0 ? 'https://via.placeholder.com/300x200' : null,
-        'url': 'https://example.com/bookmark${index + 1}',
-        'bookmarkedAt': DateTime.now().subtract(Duration(hours: index * 2)).toIso8601String(),
-      });
+      final bookmarksData = await _databaseHelper.getBookmarks();
+      final bookmarks = bookmarksData
+          .map((data) => BookmarkModel.fromMap(data))
+          .toList();
+
+      // Sort bookmarks based on selected sorting option
+      _sortBookmarks(bookmarks);
 
       setState(() {
-        _bookmarks = mockBookmarks;
+        _bookmarks = bookmarks;
         _isLoading = false;
       });
     } catch (e) {
@@ -66,54 +60,120 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     }
   }
 
+  void _sortBookmarks(List<BookmarkModel> bookmarks) {
+    switch (_sortBy) {
+      case 'recent':
+        bookmarks.sort((a, b) => b.bookmarkedAt.compareTo(a.bookmarkedAt));
+        break;
+      case 'date':
+        bookmarks.sort((a, b) => b.publishedAt.compareTo(a.publishedAt));
+        break;
+      case 'title':
+        bookmarks.sort((a, b) => a.title.compareTo(b.title));
+        break;
+    }
+  }
+
   Future<void> _removeBookmark(int index) async {
     final bookmark = _bookmarks[index];
     
-    setState(() {
-      _bookmarks.removeAt(index);
-    });
+    try {
+      setState(() {
+        _bookmarks.removeAt(index);
+      });
 
-    // TODO: Uncomment when repository is connected
-    // await _newsRepository.removeBookmark(bookmark['articleId']);
+      await _databaseHelper.removeBookmark(bookmark.articleId);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Bookmark removed'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () {
-              setState(() {
-                _bookmarks.insert(index, bookmark);
-              });
-            },
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Bookmark removed'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                try {
+                  await _databaseHelper.addBookmark(bookmark.toMap());
+                  setState(() {
+                    _bookmarks.insert(index, bookmark);
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to restore bookmark: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } catch (e) {
+      // Restore the bookmark if removal failed
+      setState(() {
+        _bookmarks.insert(index, bookmark);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove bookmark: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _removeSelectedBookmarks() async {
     final indicesToRemove = _selectedIndices.toList()..sort((a, b) => b.compareTo(a));
+    final bookmarksToRemove = <BookmarkModel>[];
     
-    for (final index in indicesToRemove) {
-      if (index < _bookmarks.length) {
-        _bookmarks.removeAt(index);
+    try {
+      // Collect bookmarks to remove
+      for (final index in indicesToRemove) {
+        if (index < _bookmarks.length) {
+          bookmarksToRemove.add(_bookmarks[index]);
+        }
       }
-    }
 
-    setState(() {
-      _selectedIndices.clear();
-      _isSelectionMode = false;
-    });
+      // Remove from database
+      for (final bookmark in bookmarksToRemove) {
+        await _databaseHelper.removeBookmark(bookmark.articleId);
+      }
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${indicesToRemove.length} bookmarks removed'),
-          backgroundColor: Colors.blue,
-        ),
-      );
+      // Remove from UI
+      for (final index in indicesToRemove) {
+        if (index < _bookmarks.length) {
+          _bookmarks.removeAt(index);
+        }
+      }
+
+      setState(() {
+        _selectedIndices.clear();
+        _isSelectionMode = false;
+      });
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${bookmarksToRemove.length} bookmarks removed'),
+            backgroundColor: Colors.blue,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove bookmarks: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+      // Reload to ensure consistency
+      await _loadBookmarks();
     }
   }
 
@@ -130,20 +190,25 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     });
   }
 
-  void _onArticleTap(dynamic bookmark, int index) {
+  void _onArticleTap(BookmarkModel bookmark, int index) {
     if (_isSelectionMode) {
       _toggleSelection(index);
     } else {
-      // TODO: Navigate to article detail
-      // Navigator.push(
-      //   context,
-      //   MaterialPageRoute(
-      //     builder: (context) => ArticleDetailScreen(article: bookmark),
-      //   ),
-      // );
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Opening: ${bookmark['title']}')),
+      // Convert bookmark to article for detail screen
+      final article = ArticleModel(
+        title: bookmark.title,
+        description: bookmark.description,
+        imageUrl: bookmark.imageUrl,
+        source: bookmark.source,
+        publishedAt: bookmark.publishedAt,
+        url: bookmark.url,
+      );
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ArticleDetailScreen(article: article),
+        ),
       );
     }
   }
@@ -198,25 +263,37 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             ListTile(
               leading: const Icon(Icons.access_time),
               title: const Text('Recently Added'),
+              trailing: _sortBy == 'recent' ? const Icon(Icons.check, color: Colors.blue) : null,
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement sorting
+                setState(() {
+                  _sortBy = 'recent';
+                });
+                _loadBookmarks();
               },
             ),
             ListTile(
               leading: const Icon(Icons.date_range),
               title: const Text('Publication Date'),
+              trailing: _sortBy == 'date' ? const Icon(Icons.check, color: Colors.blue) : null,
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement sorting
+                setState(() {
+                  _sortBy = 'date';
+                });
+                _loadBookmarks();
               },
             ),
             ListTile(
               leading: const Icon(Icons.sort_by_alpha),
               title: const Text('Title (A-Z)'),
+              trailing: _sortBy == 'title' ? const Icon(Icons.check, color: Colors.blue) : null,
               onTap: () {
                 Navigator.pop(context);
-                // TODO: Implement sorting
+                setState(() {
+                  _sortBy = 'title';
+                });
+                _loadBookmarks();
               },
             ),
           ],
@@ -314,7 +391,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         final isSelected = _selectedIndices.contains(index);
 
         return Dismissible(
-          key: Key('bookmark_${bookmark['id']}'),
+          key: Key('bookmark_${bookmark.id}'),
           direction: _isSelectionMode 
               ? DismissDirection.none 
               : DismissDirection.endToStart,
@@ -347,7 +424,7 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
 }
 
 class BookmarkCardInline extends StatelessWidget {
-  final dynamic bookmark;
+  final BookmarkModel bookmark;
   final bool isSelected;
   final bool isSelectionMode;
   final VoidCallback onTap;
@@ -415,11 +492,11 @@ class BookmarkCardInline extends StatelessWidget {
                 ),
 
               // Image
-              if (bookmark['imageUrl'] != null)
+              if (bookmark.imageUrl != null)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    bookmark['imageUrl'],
+                    bookmark.imageUrl!,
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
@@ -451,7 +528,7 @@ class BookmarkCardInline extends StatelessWidget {
                   children: [
                     // Title
                     Text(
-                      bookmark['title'],
+                      bookmark.title,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -465,7 +542,7 @@ class BookmarkCardInline extends StatelessWidget {
 
                     // Source
                     Text(
-                      bookmark['source'],
+                      bookmark.source,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -497,7 +574,7 @@ class BookmarkCardInline extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Saved ${_formatDate(bookmark['bookmarkedAt'])}',
+                            'Saved ${_formatDate(bookmark.bookmarkedAt.toIso8601String())}',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.blue[700],

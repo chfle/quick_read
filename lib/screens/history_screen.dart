@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-
+import '../database/database_helper.dart';
+import '../models/reading_history_model.dart';
+import '../models/article_model.dart';
+import 'article_detail_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({Key? key}) : super(key: key);
@@ -9,9 +12,9 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  // final NewsRepository _newsRepository = NewsRepository();
+  final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
   
-  List<dynamic> _history = []; // Replace with List<ReadingHistoryModel>
+  List<ReadingHistoryModel> _history = [];
   bool _isLoading = false;
   String _filter = 'all'; // all, today, week, month
 
@@ -27,27 +30,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
 
     try {
-      // TODO: Uncomment when repository is connected
-      // final history = await _newsRepository.getReadingHistory();
-      
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Mock history data
-      final mockHistory = List.generate(15, (index) => {
-        'id': index,
-        'articleId': 'article_$index',
-        'title': 'Read Article ${index + 1}: News story you viewed recently',
-        'imageUrl': index % 3 != 0 ? 'https://via.placeholder.com/300x200' : null,
-        'source': 'News Source ${index % 4 + 1}',
-        'url': 'https://example.com/article${index + 1}',
-        'readAt': DateTime.now().subtract(Duration(
-          hours: index < 5 ? index * 2 : 24,
-          days: index < 5 ? 0 : index - 4,
-        )).toIso8601String(),
-      });
+      final historyData = await _databaseHelper.getReadingHistory();
+      final history = historyData
+          .map((data) => ReadingHistoryModel.fromMap(data))
+          .toList();
 
       setState(() {
-        _history = mockHistory;
+        _history = history;
         _isLoading = false;
       });
     } catch (e) {
@@ -69,27 +58,52 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _deleteHistoryItem(int index) async {
     final item = _history[index];
     
-    setState(() {
-      _history.removeAt(index);
-    });
+    try {
+      setState(() {
+        _history.removeAt(index);
+      });
 
-    // TODO: Uncomment when repository is connected
-    // await _newsRepository.deleteHistoryItem(item['id']);
+      await _databaseHelper.deleteHistoryItem(item.id!);
 
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Item removed from history'),
-          action: SnackBarAction(
-            label: 'Undo',
-            onPressed: () {
-              setState(() {
-                _history.insert(index, item);
-              });
-            },
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Item removed from history'),
+            action: SnackBarAction(
+              label: 'Undo',
+              onPressed: () async {
+                try {
+                  await _databaseHelper.addToHistory(item.toMap());
+                  setState(() {
+                    _history.insert(index, item);
+                  });
+                } catch (e) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to restore item: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              },
+            ),
           ),
-        ),
-      );
+        );
+      }
+    } catch (e) {
+      // Restore the item if deletion failed
+      setState(() {
+        _history.insert(index, item);
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to remove item: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -116,45 +130,59 @@ class _HistoryScreenState extends State<HistoryScreen> {
     );
 
     if (confirmedClear == true) {
-      setState(() {
-        _history.clear();
-      });
+      try {
+        await _databaseHelper.clearHistory();
+        
+        setState(() {
+          _history.clear();
+        });
 
-      // TODO: Uncomment when repository is connected
-      // await _newsRepository.clearHistory();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('History cleared'),
-            backgroundColor: Colors.blue,
-          ),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('History cleared'),
+              backgroundColor: Colors.blue,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Failed to clear history: $e'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
     }
   }
 
-  void _onArticleTap(dynamic historyItem) {
-    // TODO: Navigate to article detail
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => ArticleDetailScreen(article: historyItem),
-    //   ),
-    // );
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening: ${historyItem['title']}')),
+  void _onArticleTap(ReadingHistoryModel historyItem) {
+    // Convert history item to article for detail screen
+    final article = ArticleModel(
+      title: historyItem.title,
+      imageUrl: historyItem.imageUrl,
+      source: historyItem.source,
+      url: historyItem.url,
+      publishedAt: DateTime.now().toIso8601String(), // Default value
+    );
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ArticleDetailScreen(article: article),
+      ),
     );
   }
 
-  List<dynamic> get _filteredHistory {
+  List<ReadingHistoryModel> get _filteredHistory {
     final now = DateTime.now();
     
     switch (_filter) {
       case 'today':
         return _history.where((item) {
-          final readAt = DateTime.parse(item['readAt']);
+          final readAt = item.readAt;
           return readAt.year == now.year &&
                  readAt.month == now.month &&
                  readAt.day == now.day;
@@ -163,15 +191,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       case 'week':
         final weekAgo = now.subtract(const Duration(days: 7));
         return _history.where((item) {
-          final readAt = DateTime.parse(item['readAt']);
-          return readAt.isAfter(weekAgo);
+          return item.readAt.isAfter(weekAgo);
         }).toList();
       
       case 'month':
         final monthAgo = now.subtract(const Duration(days: 30));
         return _history.where((item) {
-          final readAt = DateTime.parse(item['readAt']);
-          return readAt.isAfter(monthAgo);
+          return item.readAt.isAfter(monthAgo);
         }).toList();
       
       default:
@@ -262,12 +288,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
-  Map<String, List<dynamic>> _groupByDate(List<dynamic> items) {
-    final Map<String, List<dynamic>> grouped = {};
+  Map<String, List<ReadingHistoryModel>> _groupByDate(List<ReadingHistoryModel> items) {
+    final Map<String, List<ReadingHistoryModel>> grouped = {};
     final now = DateTime.now();
 
     for (final item in items) {
-      final readAt = DateTime.parse(item['readAt']);
+      final readAt = item.readAt;
       String key;
 
       if (readAt.year == now.year && 
@@ -430,7 +456,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               final globalIndex = _history.indexOf(item);
 
               return Dismissible(
-                key: Key('history_${item['id']}'),
+                key: Key('history_${item.id}'),
                 direction: DismissDirection.endToStart,
                 background: Container(
                   alignment: Alignment.centerRight,
@@ -461,7 +487,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 }
 
 class HistoryCardInline extends StatelessWidget {
-  final dynamic item;
+  final ReadingHistoryModel item;
   final VoidCallback onTap;
 
   const HistoryCardInline({
@@ -470,25 +496,20 @@ class HistoryCardInline extends StatelessWidget {
     required this.onTap,
   }) : super(key: key);
 
-  String _formatReadTime(String dateString) {
-    try {
-      final date = DateTime.parse(dateString);
-      final now = DateTime.now();
-      final difference = now.difference(date);
+  String _formatReadTime(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
 
-      if (difference.inMinutes < 1) {
-        return 'Just now';
-      } else if (difference.inHours < 1) {
-        return '${difference.inMinutes}m ago';
-      } else if (difference.inHours < 24) {
-        return '${difference.inHours}h ago';
-      } else if (difference.inDays < 7) {
-        return '${difference.inDays}d ago';
-      } else {
-        return '${date.day}/${date.month}/${date.year}';
-      }
-    } catch (e) {
-      return '';
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inHours < 1) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else if (difference.inDays < 7) {
+      return '${difference.inDays}d ago';
+    } else {
+      return '${dateTime.day}/${dateTime.month}/${dateTime.year}';
     }
   }
 
@@ -508,11 +529,11 @@ class HistoryCardInline extends StatelessWidget {
           child: Row(
             children: [
               // Image
-              if (item['imageUrl'] != null)
+              if (item.imageUrl != null)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    item['imageUrl'],
+                    item.imageUrl!,
                     width: 80,
                     height: 80,
                     fit: BoxFit.cover,
@@ -544,7 +565,7 @@ class HistoryCardInline extends StatelessWidget {
                   children: [
                     // Title
                     Text(
-                      item['title'],
+                      item.title,
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
@@ -558,7 +579,7 @@ class HistoryCardInline extends StatelessWidget {
 
                     // Source
                     Text(
-                      item['source'],
+                      item.source,
                       style: TextStyle(
                         fontSize: 12,
                         color: Colors.grey[600],
@@ -590,7 +611,7 @@ class HistoryCardInline extends StatelessWidget {
                           ),
                           const SizedBox(width: 4),
                           Text(
-                            'Read ${_formatReadTime(item['readAt'])}',
+                            'Read ${_formatReadTime(item.readAt)}',
                             style: TextStyle(
                               fontSize: 11,
                               color: Colors.green[700],

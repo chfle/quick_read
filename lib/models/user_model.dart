@@ -32,4 +32,20 @@ class UserModel {
       createdAt: DateTime.parse(map['createdAt']),
     );
   }
+
+  UserModel copyWith({
+    int? id,
+    String? username,
+    String? password,
+    List<String>? favoriteCategories,
+    DateTime? createdAt,
+  }) {
+    return UserModel(
+      id: id ?? this.id,
+      username: username ?? this.username,
+      password: password ?? this.password,
+      favoriteCategories: favoriteCategories ?? this.favoriteCategories,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }

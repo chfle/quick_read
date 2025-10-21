@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-
+import '../services/news_api_service.dart';
+import '../models/article_model.dart';
+import '../database/database_helper.dart';
+import 'article_detail_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -9,7 +12,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  // final NewsRepository _newsRepository = NewsRepository();
+  final NewsApiService _newsApiService = NewsApiService();
+  final DatabaseHelper _databaseHelper = DatabaseHelper.instance;
   
   final List<String> _categories = [
     'general',
@@ -22,16 +26,18 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
   
   String _selectedCategory = 'general';
-  List<dynamic> _articles = []; // Replace with List<ArticleModel>
+  List<ArticleModel> _articles = [];
   bool _isLoading = false;
   bool _hasError = false;
   bool _isSearching = false;
   String _searchQuery = '';
+  Map<String, bool> _bookmarkedArticles = {};
 
   @override
   void initState() {
     super.initState();
     _loadNews();
+    _loadBookmarkStatus();
   }
 
   Future<void> _loadNews() async {
@@ -41,34 +47,49 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // TODO: Uncomment when repository is connected
-      // final articles = await _newsRepository.getTopHeadlines(
-      //   category: _selectedCategory,
-      //   pageSize: 20,
-      // );
-      
-      // Simulating API call with delay
-      await Future.delayed(const Duration(seconds: 2));
-      
-      // Mock data for now
-      final mockArticles = List.generate(10, (index) => {
-        'title': 'Breaking News: Sample Article Title ${index + 1}',
-        'description': 'This is a sample description for the article. It provides a brief overview of the content.',
-        'source': 'News Source ${index % 3 + 1}',
-        'publishedAt': DateTime.now().subtract(Duration(hours: index)).toIso8601String(),
-        'urlToImage': index % 2 == 0 ? 'https://via.placeholder.com/300x200' : null,
-        'url': 'https://example.com/article${index + 1}',
-      });
+      final response = await _newsApiService.getTopHeadlines(
+        category: _selectedCategory,
+        pageSize: 20,
+      );
 
-      setState(() {
-        _articles = mockArticles;
-        _isLoading = false;
-      });
+      if (response['status'] == 'ok') {
+        final List<dynamic> articlesJson = response['articles'] ?? [];
+        final articles = articlesJson
+            .map((json) => ArticleModel.fromNewsApi(json))
+            .toList();
+
+        setState(() {
+          _articles = articles;
+          _isLoading = false;
+        });
+        
+        _loadBookmarkStatus();
+      } else {
+        throw Exception('API returned error status');
+      }
     } catch (e) {
       setState(() {
         _hasError = true;
         _isLoading = false;
       });
+      print('Error loading news: $e');
+    }
+  }
+
+  Future<void> _loadBookmarkStatus() async {
+    try {
+      final bookmarkedStatus = <String, bool>{};
+      for (final article in _articles) {
+        final articleId = article.url.hashCode.toString();
+        final isBookmarked = await _databaseHelper.isBookmarked(articleId);
+        bookmarkedStatus[articleId] = isBookmarked;
+      }
+      
+      setState(() {
+        _bookmarkedArticles = bookmarkedStatus;
+      });
+    } catch (e) {
+      print('Error loading bookmark status: $e');
     }
   }
 
@@ -82,33 +103,32 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     try {
-      // TODO: Uncomment when repository is connected
-      // final articles = await _newsRepository.searchNews(
-      //   query: query,
-      //   pageSize: 20,
-      // );
-      
-      await Future.delayed(const Duration(seconds: 1));
-      
-      // Mock search results
-      final mockArticles = List.generate(5, (index) => {
-        'title': 'Search Result: $query - Article ${index + 1}',
-        'description': 'This article matches your search query for "$query".',
-        'source': 'Search Source ${index % 2 + 1}',
-        'publishedAt': DateTime.now().subtract(Duration(hours: index)).toIso8601String(),
-        'urlToImage': 'https://via.placeholder.com/300x200',
-        'url': 'https://example.com/search${index + 1}',
-      });
+      final response = await _newsApiService.searchNews(
+        query: query,
+        pageSize: 20,
+      );
 
-      setState(() {
-        _articles = mockArticles;
-        _isLoading = false;
-      });
+      if (response['status'] == 'ok') {
+        final List<dynamic> articlesJson = response['articles'] ?? [];
+        final articles = articlesJson
+            .map((json) => ArticleModel.fromNewsApi(json))
+            .toList();
+
+        setState(() {
+          _articles = articles;
+          _isLoading = false;
+        });
+        
+        _loadBookmarkStatus();
+      } else {
+        throw Exception('API returned error status');
+      }
     } catch (e) {
       setState(() {
         _hasError = true;
         _isLoading = false;
       });
+      print('Error searching news: $e');
     }
   }
 
@@ -129,30 +149,83 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _onArticleTap(dynamic article) {
-    // TODO: Navigate to article detail screen
-    // Navigator.push(
-    //   context,
-    //   MaterialPageRoute(
-    //     builder: (context) => ArticleDetailScreen(article: article),
-    //   ),
-    // );
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Opening: ${article['title']}')),
-    );
+  void _onArticleTap(ArticleModel article) async {
+    try {
+      // Add to reading history
+      await _databaseHelper.addToHistory({
+        'articleId': article.url.hashCode.toString(),
+        'title': article.title,
+        'imageUrl': article.imageUrl,
+        'source': article.source,
+        'url': article.url,
+        'readAt': DateTime.now().toIso8601String(),
+      });
+
+      // Navigate to article detail screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ArticleDetailScreen(article: article),
+        ),
+      );
+    } catch (e) {
+      print('Error adding to history: $e');
+      // Still navigate even if history fails
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ArticleDetailScreen(article: article),
+        ),
+      );
+    }
   }
 
-  void _onBookmarkToggle(dynamic article) {
-    // TODO: Implement bookmark toggle
-    // await _newsRepository.toggleBookmark(article);
-    
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Bookmark toggled'),
-        duration: Duration(seconds: 1),
-      ),
-    );
+  void _onBookmarkToggle(ArticleModel article) async {
+    try {
+      final articleId = article.url.hashCode.toString();
+      final isCurrentlyBookmarked = _bookmarkedArticles[articleId] ?? false;
+
+      if (isCurrentlyBookmarked) {
+        await _databaseHelper.removeBookmark(articleId);
+        setState(() {
+          _bookmarkedArticles[articleId] = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Removed from bookmarks'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      } else {
+        await _databaseHelper.addBookmark({
+          'articleId': articleId,
+          'title': article.title,
+          'description': article.description,
+          'imageUrl': article.imageUrl,
+          'source': article.source,
+          'publishedAt': article.publishedAt,
+          'url': article.url,
+          'bookmarkedAt': DateTime.now().toIso8601String(),
+        });
+        setState(() {
+          _bookmarkedArticles[articleId] = true;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Added to bookmarks'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (e) {
+      print('Error toggling bookmark: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Error updating bookmark'),
+          duration: Duration(seconds: 1),
+        ),
+      );
+    }
   }
 
   @override
@@ -232,11 +305,14 @@ class _HomeScreenState extends State<HomeScreen> {
         itemCount: _articles.length,
         itemBuilder: (context, index) {
           final article = _articles[index];
+          final articleId = article.url.hashCode.toString();
+          final isBookmarked = _bookmarkedArticles[articleId] ?? false;
           
           // Show expanded card for first article
           if (index == 0) {
             return NewsCardExpandedInline(
               article: article,
+              isBookmarked: isBookmarked,
               onTap: () => _onArticleTap(article),
               onBookmarkToggle: () => _onBookmarkToggle(article),
             );
@@ -244,6 +320,7 @@ class _HomeScreenState extends State<HomeScreen> {
           
           return NewsCardCompactInline(
             article: article,
+            isBookmarked: isBookmarked,
             onTap: () => _onArticleTap(article),
             onBookmarkToggle: () => _onBookmarkToggle(article),
           );
@@ -435,15 +512,17 @@ class CategoryTabBarInline extends StatelessWidget {
 }
 
 class NewsCardCompactInline extends StatelessWidget {
-  final dynamic article;
+  final ArticleModel article;
   final VoidCallback onTap;
   final VoidCallback onBookmarkToggle;
+  final bool isBookmarked;
 
   const NewsCardCompactInline({
     Key? key,
     required this.article,
     required this.onTap,
     required this.onBookmarkToggle,
+    this.isBookmarked = false,
   }) : super(key: key);
 
   @override
@@ -456,11 +535,11 @@ class NewsCardCompactInline extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              if (article['urlToImage'] != null)
+              if (article.imageUrl != null)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: Image.network(
-                    article['urlToImage'],
+                    article.imageUrl!,
                     width: 100,
                     height: 100,
                     fit: BoxFit.cover,
@@ -488,21 +567,24 @@ class NewsCardCompactInline extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      article['title'],
+                      article.title,
                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                       maxLines: 3,
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      article['source'],
+                      article.source,
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.bookmark_border),
+                icon: Icon(
+                  isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                  color: isBookmarked ? Colors.blue : null,
+                ),
                 onPressed: onBookmarkToggle,
               ),
             ],
@@ -514,15 +596,17 @@ class NewsCardCompactInline extends StatelessWidget {
 }
 
 class NewsCardExpandedInline extends StatelessWidget {
-  final dynamic article;
+  final ArticleModel article;
   final VoidCallback onTap;
   final VoidCallback onBookmarkToggle;
+  final bool isBookmarked;
 
   const NewsCardExpandedInline({
     Key? key,
     required this.article,
     required this.onTap,
     required this.onBookmarkToggle,
+    this.isBookmarked = false,
   }) : super(key: key);
 
   @override
@@ -534,14 +618,20 @@ class NewsCardExpandedInline extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (article['urlToImage'] != null)
+            if (article.imageUrl != null)
               ClipRRect(
                 borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
                 child: Image.network(
-                  article['urlToImage'],
+                  article.imageUrl!,
                   width: double.infinity,
                   height: 200,
                   fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: double.infinity,
+                    height: 200,
+                    color: Colors.grey[300],
+                    child: const Icon(Icons.image, size: 50),
+                  ),
                 ),
               ),
             Padding(
@@ -550,13 +640,13 @@ class NewsCardExpandedInline extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    article['title'],
+                    article.title,
                     style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  if (article['description'] != null)
+                  if (article.description != null)
                     Text(
-                      article['description'],
+                      article.description!,
                       style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                       maxLines: 3,
                     ),
@@ -565,12 +655,15 @@ class NewsCardExpandedInline extends StatelessWidget {
                     children: [
                       Expanded(
                         child: Text(
-                          article['source'],
+                          article.source,
                           style: TextStyle(fontSize: 13, color: Colors.grey[600]),
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.bookmark_border),
+                        icon: Icon(
+                          isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                          color: isBookmarked ? Colors.blue : null,
+                        ),
                         onPressed: onBookmarkToggle,
                       ),
                     ],

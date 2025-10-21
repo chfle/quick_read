@@ -13,75 +13,128 @@ class DatabaseHelper {
     return _database!;
   }
 
-  Future<Database> _initDB(String filePath) async {
-    final dbPath = await getDatabasesPath();
-    final path = join(dbPath, filePath);
+  // Explicit initialization method
+  Future<void> initialize() async {
+    await database;
+  }
 
-    return await openDatabase(
-      path,
-      version: 1,
-      onCreate: _createDB,
-    );
+  Future<Database> _initDB(String filePath) async {
+    try {
+      final dbPath = await getDatabasesPath();
+      final path = join(dbPath, filePath);
+      print('Database path: $path');
+
+      return await openDatabase(
+        path,
+        version: 1,
+        onCreate: _createDB,
+        onOpen: (db) {
+          print('Database opened successfully');
+        },
+      );
+    } catch (e) {
+      print('Error initializing database: $e');
+      rethrow;
+    }
   }
 
   Future _createDB(Database db, int version) async {
+    print('Creating database tables...');
     const idType = 'INTEGER PRIMARY KEY AUTOINCREMENT';
     const textType = 'TEXT NOT NULL';
     const textTypeNullable = 'TEXT';
 
-    // Users table
-    await db.execute('''
-      CREATE TABLE users (
-        id $idType,
-        username $textType UNIQUE,
-        password $textType,
-        favoriteCategories $textType,
-        createdAt $textType
-      )
-    ''');
+    try {
+      // Users table
+      print('Creating users table...');
+      await db.execute('''
+        CREATE TABLE users (
+          id $idType,
+          username $textType UNIQUE,
+          password $textType,
+          favoriteCategories $textType,
+          createdAt $textType
+        )
+      ''');
+      print('Users table created successfully');
+    } catch (e) {
+      print('Error creating users table: $e');
+      rethrow;
+    }
 
-    // Bookmarks table
-    await db.execute('''
-      CREATE TABLE bookmarks (
-        id $idType,
-        articleId $textType UNIQUE,
-        title $textType,
-        description $textTypeNullable,
-        imageUrl $textTypeNullable,
-        source $textType,
-        publishedAt $textType,
-        url $textType,
-        bookmarkedAt $textType
-      )
-    ''');
+    try {
+      // Bookmarks table
+      print('Creating bookmarks table...');
+      await db.execute('''
+        CREATE TABLE bookmarks (
+          id $idType,
+          articleId $textType UNIQUE,
+          title $textType,
+          description $textTypeNullable,
+          imageUrl $textTypeNullable,
+          source $textType,
+          publishedAt $textType,
+          url $textType,
+          bookmarkedAt $textType
+        )
+      ''');
+      print('Bookmarks table created successfully');
+    } catch (e) {
+      print('Error creating bookmarks table: $e');
+      rethrow;
+    }
 
-    // Reading history table
-    await db.execute('''
-      CREATE TABLE reading_history (
-        id $idType,
-        articleId $textType,
-        title $textType,
-        imageUrl $textTypeNullable,
-        source $textType,
-        url $textType,
-        readAt $textType
-      )
-    ''');
+    try {
+      // Reading history table
+      print('Creating reading_history table...');
+      await db.execute('''
+        CREATE TABLE reading_history (
+          id $idType,
+          articleId $textType,
+          title $textType,
+          imageUrl $textTypeNullable,
+          source $textType,
+          url $textType,
+          readAt $textType
+        )
+      ''');
+      print('Reading history table created successfully');
+    } catch (e) {
+      print('Error creating reading_history table: $e');
+      rethrow;
+    }
 
-    // Create indexes for better performance
-    await db.execute('''
-      CREATE INDEX idx_bookmarks_articleId ON bookmarks(articleId)
-    ''');
+    try {
+      // Create indexes for better performance
+      print('Creating indexes...');
+      await db.execute('''
+        CREATE INDEX idx_bookmarks_articleId ON bookmarks(articleId)
+      ''');
 
-    await db.execute('''
-      CREATE INDEX idx_history_readAt ON reading_history(readAt DESC)
-    ''');
+      await db.execute('''
+        CREATE INDEX idx_history_readAt ON reading_history(readAt DESC)
+      ''');
+      print('Indexes created successfully');
+    } catch (e) {
+      print('Error creating indexes: $e');
+      rethrow;
+    }
+    
+    print('Database setup completed successfully');
   }
 
   // User operations
   Future<int> createUser(Map<String, dynamic> user) async {
-    final db = await database;
-    return await db.insert('users', user);
+    try {
+      final db = await database;
+      print('Creating user with data: $user');
+      final result = await db.insert('users', user);
+      print('User created with ID: $result');
+      return result;
+    } catch (e) {
+      print('Error creating user: $e');
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>?> getUser(String username) async {

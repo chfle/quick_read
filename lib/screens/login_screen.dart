@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:quick_read/screens/main_screen.dart';
+import '../repository/user_repository.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -17,7 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  // final UserRepository _userRepository = UserRepository();
+  final UserRepository _userRepository = UserRepository();
 
   @override
   void dispose() {
@@ -38,13 +39,19 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       if (_isLogin) {
         // Login logic
-        // final user = await _userRepository.loginUser(
-        //   username: _usernameController.text.trim(),
-        //   password: _passwordController.text,
-        // );
+        final user = await _userRepository.loginUser(
+          username: _usernameController.text.trim(),
+          password: _passwordController.text,
+        );
         
-        // For now, just navigate to main screen
-        if (mounted) {
+        if (user != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Welcome back, ${user.username}!'),
+              backgroundColor: Colors.green,
+            ),
+          );
+          
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(
               builder: (context) => const MainScreen(),
@@ -53,16 +60,17 @@ class _LoginScreenState extends State<LoginScreen> {
         }
       } else {
         // Register logic
-        // await _userRepository.registerUser(
-        //   username: _usernameController.text.trim(),
-        //   password: _passwordController.text,
-        // );
+        await _userRepository.registerUser(
+          username: _usernameController.text.trim(),
+          password: _passwordController.text,
+          favoriteCategories: ['general', 'technology'], // Default categories
+        );
         
         // Show success and switch to login
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Account created! Please login.'),
+              content: Text('Account created successfully! Please login.'),
               backgroundColor: Colors.green,
             ),
           );
@@ -74,9 +82,15 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
+        String errorMessage = e.toString();
+        // Clean up error message
+        if (errorMessage.startsWith('Exception: ')) {
+          errorMessage = errorMessage.substring(11);
+        }
+        
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(errorMessage),
             backgroundColor: Colors.red,
           ),
         );

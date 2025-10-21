@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../repository/user_repository.dart';
+import '../services/news_api_service.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({Key? key}) : super(key: key);
@@ -8,20 +11,25 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  // final UserRepository _userRepository = UserRepository();
+  final UserRepository _userRepository = UserRepository();
   
-  String _username = 'JohnDoe'; // Replace with actual logged in user
-  List<String> _selectedCategories = ['general', 'technology']; // Default
+  String _username = 'User'; // Will be loaded from session
+  int? _userId;
+  List<String> _selectedCategories = ['general', 'technology'];
+  bool _notificationsEnabled = true;
+  bool _darkModeEnabled = false;
+  String _selectedCountry = 'us';
+  bool _isLoading = false;
   
-  final List<String> _availableCategories = [
-    'general',
-    'business',
-    'entertainment',
-    'health',
-    'science',
-    'sports',
-    'technology',
-  ];
+  final List<String> _availableCategories = NewsApiService.availableCategories;
+  
+  final Map<String, String> _availableCountries = {
+    'us': 'United States',
+    'gb': 'United Kingdom',
+    'ca': 'Canada',
+    'au': 'Australia',
+    'de': 'Germany',
+  };
 
   @override
   void initState() {
@@ -30,13 +38,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadUserSettings() async {
-    // TODO: Load from database
-    // final user = await _userRepository.getUser(_username);
-    // if (user != null) {
-    //   setState(() {
-    //     _selectedCategories = user.favoriteCategories;
-    //   });
-    // }
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // For now, we'll use a hardcoded username since we don't have session management
+      // In a real app, you'd get this from shared preferences or a session manager
+      const tempUsername = 'testuser';
+      
+      final user = await _userRepository.getUser(tempUsername);
+      if (user != null) {
+        setState(() {
+          _username = user.username;
+          _userId = user.id;
+          _selectedCategories = user.favoriteCategories;
+        });
+      } else {
+        // Create a default user if none exists
+        await _userRepository.registerUser(
+          username: tempUsername,
+          password: 'password123',
+          favoriteCategories: ['general', 'technology'],
+        );
+        setState(() {
+          _username = tempUsername;
+          _selectedCategories = ['general', 'technology'];
+        });
+      }
+    } catch (e) {
+      print('Error loading user settings: $e');
+      // Use defaults if loading fails
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _saveCategories(List<String> categories) async {
+    if (_userId == null) return;
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _userRepository.updateFavoriteCategories(
+        userId: _userId!,
+        categories: categories,
+      );
+      
+      setState(() {
+        _selectedCategories = categories;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Categories updated successfully!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update categories: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 
   void _showCategorySelector() {
@@ -59,22 +133,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: CategorySelectorSheet(
             categories: _availableCategories,
             selectedCategories: _selectedCategories,
-            onSave: (selected) {
-              setState(() {
-                _selectedCategories = selected;
-              });
-              // TODO: Save to database
-              // _userRepository.updateFavoriteCategories(...)
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Categories updated successfully!'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+            onSave: (selected) async {
               Navigator.pop(context);
+              await _saveCategories(selected);
             },
           ),
+        ),
+      ),
+    );
+  }
+
+  void _showCountrySelector() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Select Country',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            ..._availableCountries.entries.map((entry) {
+              final isSelected = _selectedCountry == entry.key;
+              return ListTile(
+                title: Text(entry.value),
+                trailing: isSelected ? const Icon(Icons.check, color: Colors.blue) : null,
+                onTap: () {
+                  setState(() {
+                    _selectedCountry = entry.key;
+                  });
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Country changed to ${entry.value}'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                },
+              );
+            }).toList(),
+          ],
         ),
       ),
     );
@@ -130,9 +231,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           TextButton(
             onPressed: () {
-              // TODO: Clear user session
               Navigator.pop(context); // Close dialog
-              // Navigate to login screen
+              
+              // Clear any session data here (like SharedPreferences)
+              // In a real app, you'd clear tokens, user data, etc.
+              
+              // Navigate to login screen and clear the navigation stack
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(
+                  builder: (context) => const LoginScreen(),
+                ),
+                (route) => false,
+              );
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Logged out successfully'),
+                  backgroundColor: Colors.green,
+                ),
+              );
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Logout'),
@@ -144,6 +261,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: Colors.grey[100],
+        appBar: AppBar(
+          title: const Text('Settings'),
+          backgroundColor: Colors.blue,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: const Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -234,10 +366,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingsListTileWidget(
             leadingIcon: Icons.language,
             title: 'Country',
-            trailingText: 'United States',
-            onTap: () {
-              // TODO: Implement country selector
-            },
+            trailingText: _availableCountries[_selectedCountry] ?? 'United States',
+            onTap: _showCountrySelector,
           ),
 
           const SizedBox(height: 16),
@@ -259,9 +389,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leadingIcon: Icons.notifications,
             title: 'Notifications',
             trailing: Switch(
-              value: true,
+              value: _notificationsEnabled,
               onChanged: (value) {
-                // TODO: Implement notifications toggle
+                setState(() {
+                  _notificationsEnabled = value;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Notifications ${value ? 'enabled' : 'disabled'}'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               },
             ),
             onTap: null,
@@ -271,9 +409,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
             leadingIcon: Icons.dark_mode,
             title: 'Dark Mode',
             trailing: Switch(
-              value: false,
+              value: _darkModeEnabled,
               onChanged: (value) {
-                // TODO: Implement dark mode
+                setState(() {
+                  _darkModeEnabled = value;
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Dark mode ${value ? 'enabled' : 'disabled'}'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
               },
             ),
             onTap: null,

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 class NewsApiService {
-  // PUT YOUR API KEY HERE
-  static const String _apiKey = '2f35ee13c0404660be0deb86ebe7e908';
+  // API key from environment variables
+  static String get _apiKey => dotenv.env['NEWS_API_KEY'] ?? '';
   static const String _baseUrl = 'https://newsapi.org/v2';
 
   // Available categories

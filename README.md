@@ -69,6 +69,15 @@ lib/
 - Error handling could be improved
 - Testing coverage is incomplete
 
+## UI
+
+
+![Login](/readme/images/Simulator%20Screenshot%20-%20iPhone%2016.png)
+![Home](/readme/images/Simulator%20Screenshot%20-%20iPhone%2016%20-%202025-10-26%20at%2013.03.56.png)
+![History](/readme/images/Simulator%20Screenshot%20-%20iPhone%2016%20-%202025-10-26%20at%2013.03.46.png)
+![Settings](/readme/images/Simulator%20Screenshot%20-%20iPhone%2016%20-%202025-10-26%20at%2013.04.21.png)
+![History](/readme/images/Simulator%20Screenshot%20-%20iPhone%2016%20-%202025-10-26%20at%2013.28.26.png)
+
 ## Contributing
 
 This is a development project. Feel free to report issues or suggest improvements.

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:quick_read/screens/main_screen.dart';
 import '../repository/user_repository.dart';
+import '../services/user_session_service.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -13,12 +14,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _isLogin = true; // Toggle between login and register
   bool _isLoading = false;
   bool _obscurePassword = true;
 
   final UserRepository _userRepository = UserRepository();
+  final UserSessionService _sessionService = UserSessionService();
 
   @override
   void dispose() {
@@ -43,20 +45,25 @@ class _LoginScreenState extends State<LoginScreen> {
           username: _usernameController.text.trim(),
           password: _passwordController.text,
         );
-        
-        if (user != null && mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Welcome back, ${user.username}!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          
-          Navigator.of(context).pushReplacement(
-            MaterialPageRoute(
-              builder: (context) => const MainScreen(),
-            ),
-          );
+
+        if (user != null) {
+          // Save user session
+          await _sessionService.login(user);
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Welcome back, ${user.username}!'),
+                backgroundColor: Colors.green,
+              ),
+            );
+
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (context) => const MainScreen(),
+              ),
+            );
+          }
         }
       } else {
         // Register logic

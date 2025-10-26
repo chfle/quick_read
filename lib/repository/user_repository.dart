@@ -77,20 +77,30 @@ class UserRepository {
     required List<String> categories,
   }) async {
     try {
-      final userMap = await _dbHelper.getUser(''); // Need to get by ID
-      if (userMap != null) {
-        final user = UserModel.fromMap(userMap);
-        final updatedUser = UserModel(
-          id: user.id,
-          username: user.username,
-          password: user.password,
-          favoriteCategories: categories,
-          createdAt: user.createdAt,
-        );
-        await _dbHelper.updateUser(userId, updatedUser.toMap());
-      }
+      final updateData = {
+        'favoriteCategories': categories.join(','),
+      };
+      await _dbHelper.updateUser(userId, updateData);
     } catch (e) {
       throw Exception('Failed to update categories: $e');
+    }
+  }
+
+  // Get user by ID
+  Future<UserModel?> getUserById(int id) async {
+    try {
+      final db = await _dbHelper.database;
+      final result = await db.query(
+        'users',
+        where: 'id = ?',
+        whereArgs: [id],
+      );
+      if (result.isNotEmpty) {
+        return UserModel.fromMap(result.first);
+      }
+      return null;
+    } catch (e) {
+      throw Exception('Failed to get user by ID: $e');
     }
   }
 

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import '../repository/user_repository.dart';
 import '../services/news_api_service.dart';
+import '../services/user_session_service.dart';
+import '../models/user_model.dart';
+import '../database/database_helper.dart';
 import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -12,14 +15,18 @@ class SettingsScreen extends StatefulWidget {
 
 class _SettingsScreenState extends State<SettingsScreen> {
   final UserRepository _userRepository = UserRepository();
+  final UserSessionService _sessionService = UserSessionService();
+  final DatabaseHelper _dbHelper = DatabaseHelper.instance;
   
-  String _username = 'User'; // Will be loaded from session
-  int? _userId;
+  UserModel? _currentUser;
   List<String> _selectedCategories = ['general', 'technology'];
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
   String _selectedCountry = 'us';
   bool _isLoading = false;
+  
+  int _bookmarkCount = 0;
+  int _historyCount = 0;
   
   final List<String> _availableCategories = NewsApiService.availableCategories;
   
@@ -30,6 +37,49 @@ class _SettingsScreenState extends State<SettingsScreen> {
     'au': 'Australia',
     'de': 'Germany',
   };
+
+  String _formatDate(DateTime? date) {
+    if (date == null) return 'Unknown';
+    return '${date.day}/${date.month}/${date.year}';
+  }
+
+  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 32,
+            color: color,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: color,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 12,
+              color: Colors.grey[600],
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   void initState() {
@@ -43,28 +93,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
     });
 
     try {
-      // For now, we'll use a hardcoded username since we don't have session management
-      // In a real app, you'd get this from shared preferences or a session manager
-      const tempUsername = 'testuser';
-      
-      final user = await _userRepository.getUser(tempUsername);
-      if (user != null) {
+      // Try to restore session first
+      await _sessionService.restoreSession();
+
+      _currentUser = _sessionService.currentUser;
+
+      if (_currentUser != null) {
         setState(() {
-          _username = user.username;
-          _userId = user.id;
-          _selectedCategories = user.favoriteCategories;
+          _selectedCategories = _currentUser!.favoriteCategories;
         });
+
+        // Load statistics
+        await _loadStatistics();
       } else {
-        // Create a default user if none exists
-        await _userRepository.registerUser(
-          username: tempUsername,
-          password: 'password123',
-          favoriteCategories: ['general', 'technology'],
-        );
-        setState(() {
-          _username = tempUsername;
-          _selectedCategories = ['general', 'technology'];
-        });
+        // No user logged in - redirect to login
+        if (mounted) {
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const LoginScreen(),
+            ),
+            (route) => false,
+          );
+        }
       }
     } catch (e) {
       print('Error loading user settings: $e');
@@ -76,8 +126,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _loadStatistics() async {
+    try {
+      final bookmarks = await _dbHelper.getBookmarks();
+      final history = await _dbHelper.getReadingHistory();
+      
+      setState(() {
+        _bookmarkCount = bookmarks.length;
+        _historyCount = history.length;
+      });
+    } catch (e) {
+      print('Error loading statistics: $e');
+    }
+  }
+
   Future<void> _saveCategories(List<String> categories) async {
-    if (_userId == null) return;
+    if (_currentUser?.id == null) return;
 
     setState(() {
       _isLoading = true;
@@ -85,27 +149,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       await _userRepository.updateFavoriteCategories(
-        userId: _userId!,
+        userId: _currentUser!.id!,
         categories: categories,
       );
-      
-      setState(() {
-        _selectedCategories = categories;
-      });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Categories updated successfully!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Refresh user from database to get the latest data
+      final updatedUser = await _userRepository.getUserById(_currentUser!.id!);
+
+      if (updatedUser != null) {
+        setState(() {
+          _currentUser = updatedUser;
+          _selectedCategories = updatedUser.favoriteCategories;
+        });
+
+        await _sessionService.updateCurrentUser(updatedUser);
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Categories updated successfully!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update categories: $e'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update categories: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     } finally {
       setState(() {
         _isLoading = false;
@@ -230,26 +306,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context); // Close dialog
               
-              // Clear any session data here (like SharedPreferences)
-              // In a real app, you'd clear tokens, user data, etc.
+              // Clear session data
+              await _sessionService.logout();
               
               // Navigate to login screen and clear the navigation stack
-              Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(
-                  builder: (context) => const LoginScreen(),
-                ),
-                (route) => false,
-              );
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Logged out successfully'),
-                  backgroundColor: Colors.green,
-                ),
-              );
+              if (mounted) {
+                Navigator.of(context).pushAndRemoveUntil(
+                  MaterialPageRoute(
+                    builder: (context) => const LoginScreen(),
+                  ),
+                  (route) => false,
+                );
+                
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Logged out successfully'),
+                    backgroundColor: Colors.green,
+                  ),
+                );
+              }
             },
             style: TextButton.styleFrom(foregroundColor: Colors.red),
             child: const Text('Logout'),
@@ -319,7 +397,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        _username,
+                        _currentUser?.username ?? 'User',
                         style: const TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.bold,
@@ -334,8 +412,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           color: Colors.white.withOpacity(0.9),
                         ),
                       ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Member since ${_formatDate(_currentUser?.createdAt)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.white.withOpacity(0.7),
+                        ),
+                      ),
                     ],
                   ),
+                ),
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 16),
+
+          // Statistics Section
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your Activity',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.grey[800],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        'Bookmarks',
+                        _bookmarkCount.toString(),
+                        Icons.bookmark,
+                        Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        'Articles Read',
+                        _historyCount.toString(),
+                        Icons.article,
+                        Colors.green,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -359,7 +499,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SettingsListTileWidget(
             leadingIcon: Icons.category,
             title: 'Favorite Categories',
-            subtitle: _selectedCategories.join(', '),
+            subtitle: _selectedCategories.isEmpty
+                ? 'No categories selected'
+                : _selectedCategories.map((cat) => cat[0].toUpperCase() + cat.substring(1)).join(', '),
             onTap: _showCategorySelector,
           ),
 

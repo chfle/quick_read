@@ -124,4 +124,51 @@ class UserRepository {
       return false;
     }
   }
+
+  // Update username
+  Future<void> updateUsername({
+    required int userId,
+    required String newUsername,
+  }) async {
+    try {
+      // Check if new username is already taken by another user
+      final existingUser = await _dbHelper.getUser(newUsername);
+      if (existingUser != null && existingUser['id'] != userId) {
+        throw Exception('Username already taken');
+      }
+
+      final updateData = {
+        'username': newUsername,
+      };
+      await _dbHelper.updateUser(userId, updateData);
+    } catch (e) {
+      throw Exception('Failed to update username: $e');
+    }
+  }
+
+  // Update password
+  Future<void> updatePassword({
+    required int userId,
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      // Verify current password first
+      final user = await getUserById(userId);
+      if (user == null) {
+        throw Exception('User not found');
+      }
+
+      if (user.password != currentPassword) {
+        throw Exception('Current password is incorrect');
+      }
+
+      final updateData = {
+        'password': newPassword,
+      };
+      await _dbHelper.updateUser(userId, updateData);
+    } catch (e) {
+      throw Exception('Failed to update password: $e');
+    }
+  }
 }

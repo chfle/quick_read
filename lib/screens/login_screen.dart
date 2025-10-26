@@ -128,7 +128,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50],
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.blue.withOpacity(0.2)
+                          : Colors.blue[50],
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -158,7 +160,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         : 'Sign up to get started',
                     style: TextStyle(
                       fontSize: 16,
-                      color: Colors.grey[600],
+                      color: Theme.of(context).brightness == Brightness.dark
+                          ? Colors.grey[400]
+                          : Colors.grey[600],
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -176,7 +180,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
                     ),
                     validator: (value) {
                       if (value == null || value.trim().isEmpty) {
@@ -215,7 +218,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                       filled: true,
-                      fillColor: Colors.grey[50],
                     ),
                     validator: (value) {
                       if (value == null || value.isEmpty) {
@@ -272,7 +274,11 @@ class _LoginScreenState extends State<LoginScreen> {
                         _isLogin
                             ? "Don't have an account? "
                             : "Already have an account? ",
-                        style: TextStyle(color: Colors.grey[600]),
+                        style: TextStyle(
+                          color: Theme.of(context).brightness == Brightness.dark
+                              ? Colors.grey[400]
+                              : Colors.grey[600],
+                        ),
                       ),
                       TextButton(
                         onPressed: () {

@@ -305,14 +305,10 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
-        title: Text(_isSelectionMode 
-            ? '${_selectedIndices.length} selected' 
+        title: Text(_isSelectionMode
+            ? '${_selectedIndices.length} selected'
             : 'Bookmarks'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
         leading: _isSelectionMode
             ? IconButton(
                 icon: const Icon(Icons.close),
@@ -356,7 +352,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
               Icon(
                 Icons.bookmark_border,
                 size: 100,
-                color: Colors.grey[300],
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? Colors.grey[700]
+                    : Colors.grey[300],
               ),
               const SizedBox(height: 24),
               const Text(
@@ -372,7 +370,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                 'Save articles you want to read later by tapping the bookmark icon',
                 style: TextStyle(
                   fontSize: 15,
-                  color: Colors.grey[600],
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? Colors.grey[400]
+                      : Colors.grey[600],
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
@@ -459,10 +459,13 @@ class BookmarkCardInline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       elevation: isSelected ? 4 : 1,
-      color: isSelected ? Colors.blue[50] : Colors.white,
+      color: isSelected
+          ? (isDark ? Colors.blue.withOpacity(0.2) : Colors.blue[50])
+          : Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
@@ -503,7 +506,7 @@ class BookmarkCardInline extends StatelessWidget {
                     errorBuilder: (_, __, ___) => Container(
                       width: 100,
                       height: 100,
-                      color: Colors.grey[300],
+                      color: isDark ? Colors.grey[800] : Colors.grey[300],
                       child: const Icon(Icons.image_not_supported),
                     ),
                   ),
@@ -513,7 +516,7 @@ class BookmarkCardInline extends StatelessWidget {
                   width: 100,
                   height: 100,
                   decoration: BoxDecoration(
-                    color: Colors.grey[300],
+                    color: isDark ? Colors.grey[800] : Colors.grey[300],
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.article, size: 40),
@@ -545,7 +548,7 @@ class BookmarkCardInline extends StatelessWidget {
                       bookmark.source,
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.grey[600],
+                        color: isDark ? Colors.grey[400] : Colors.grey[600],
                         fontWeight: FontWeight.w500,
                       ),
                       maxLines: 1,
@@ -561,7 +564,7 @@ class BookmarkCardInline extends StatelessWidget {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
+                        color: isDark ? Colors.blue.withOpacity(0.2) : Colors.blue[50],
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Row(
@@ -570,14 +573,14 @@ class BookmarkCardInline extends StatelessWidget {
                           Icon(
                             Icons.bookmark,
                             size: 12,
-                            color: Colors.blue[700],
+                            color: isDark ? Colors.blue[300] : Colors.blue[700],
                           ),
                           const SizedBox(width: 4),
                           Text(
                             'Saved ${_formatDate(bookmark.bookmarkedAt.toIso8601String())}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.blue[700],
+                              color: isDark ? Colors.blue[300] : Colors.blue[700],
                               fontWeight: FontWeight.w600,
                             ),
                           ),

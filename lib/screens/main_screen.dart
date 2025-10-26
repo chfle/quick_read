@@ -57,9 +57,13 @@ class _MainScreenState extends State<MainScreen> {
           currentIndex: _currentIndex,
           onTap: _onTabTapped,
           type: BottomNavigationBarType.fixed,
-          backgroundColor: Colors.white,
+          backgroundColor: Theme.of(context).brightness == Brightness.dark
+              ? const Color(0xFF1E1E1E)
+              : Colors.white,
           selectedItemColor: Colors.blue,
-          unselectedItemColor: Colors.grey[600],
+          unselectedItemColor: Theme.of(context).brightness == Brightness.dark
+              ? Colors.grey[400]
+              : Colors.grey[600],
           selectedFontSize: 12,
           unselectedFontSize: 12,
           elevation: 0,

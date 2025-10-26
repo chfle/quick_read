@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../repository/user_repository.dart';
 import '../services/news_api_service.dart';
 import '../services/user_session_service.dart';
+import '../services/theme_service.dart';
 import '../models/user_model.dart';
 import '../database/database_helper.dart';
 import 'login_screen.dart';
@@ -17,14 +18,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final UserRepository _userRepository = UserRepository();
   final UserSessionService _sessionService = UserSessionService();
   final DatabaseHelper _dbHelper = DatabaseHelper.instance;
-  
+  final ThemeService _themeService = ThemeService();
+
   UserModel? _currentUser;
   List<String> _selectedCategories = ['general', 'technology'];
   bool _notificationsEnabled = true;
   bool _darkModeEnabled = false;
   String _selectedCountry = 'us';
   bool _isLoading = false;
-  
+
   int _bookmarkCount = 0;
   int _historyCount = 0;
   
@@ -101,6 +103,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (_currentUser != null) {
         setState(() {
           _selectedCategories = _currentUser!.favoriteCategories;
+          _darkModeEnabled = _themeService.isDarkMode;
         });
 
         // Load statistics
@@ -199,9 +202,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         minChildSize: 0.5,
         maxChildSize: 0.95,
         builder: (context, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.only(
+          decoration: BoxDecoration(
+            color: Theme.of(context).scaffoldBackgroundColor,
+            borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(20),
               topRight: Radius.circular(20),
             ),
@@ -629,12 +632,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
-        backgroundColor: Colors.grey[100],
         appBar: AppBar(
           title: const Text('Settings'),
-          backgroundColor: Colors.blue,
-          foregroundColor: Colors.white,
-          elevation: 0,
         ),
         body: const Center(
           child: CircularProgressIndicator(),
@@ -643,12 +642,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Settings'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16),
@@ -722,7 +717,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               borderRadius: BorderRadius.circular(16),
               boxShadow: [
                 BoxShadow(
@@ -840,16 +835,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: 'Dark Mode',
             trailing: Switch(
               value: _darkModeEnabled,
-              onChanged: (value) {
+              onChanged: (value) async {
                 setState(() {
                   _darkModeEnabled = value;
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('Dark mode ${value ? 'enabled' : 'disabled'}'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                await _themeService.setDarkMode(value);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Dark mode ${value ? 'enabled' : 'disabled'}'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               },
             ),
             onTap: null,
@@ -1020,10 +1018,10 @@ class _CategorySelectorSheetState extends State<CategorySelectorSheet> {
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isSelected ? Colors.blue : Colors.white,
+                    color: isSelected ? Colors.blue : Theme.of(context).cardColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? Colors.blue : Colors.grey[300]!,
+                      color: isSelected ? Colors.blue : (Theme.of(context).brightness == Brightness.dark ? Colors.grey[700]! : Colors.grey[300]!),
                       width: 2,
                     ),
                   ),
@@ -1134,7 +1132,7 @@ class SettingsListTileWidget extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       elevation: 0,
-      color: Colors.white,
+      color: Theme.of(context).cardColor,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),

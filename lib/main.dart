@@ -6,13 +6,14 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'dart:io';
 import 'database/database_helper.dart';
 import 'screens/login_screen.dart';
+import 'services/theme_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   // Load environment variables
   await dotenv.load(fileName: ".env");
-  
+
   // Initialize sqflite for desktop platforms
   if (!kIsWeb && (Platform.isWindows || Platform.isLinux || Platform.isMacOS)) {
     // Initialize FFI
@@ -21,7 +22,7 @@ void main() async {
     databaseFactory = databaseFactoryFfi;
     print('Using sqflite FFI for desktop platform');
   }
-  
+
   // Initialize the database
   try {
     await DatabaseHelper.instance.initialize();
@@ -29,21 +30,49 @@ void main() async {
   } catch (e) {
     print('Database initialization error: $e');
   }
-  
+
+  // Initialize theme service
+  await ThemeService().initialize();
+
   runApp(const MyApp());
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends StatefulWidget {
   const MyApp({Key? key}) : super(key: key);
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
+  final ThemeService _themeService = ThemeService();
+
+  @override
+  void initState() {
+    super.initState();
+    // Listen to theme changes
+    _themeService.addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    _themeService.removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    setState(() {
+      // Rebuild when theme changes
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Quick Read - News App',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        useMaterial3: true,
-      ),
+      theme: _themeService.lightTheme,
+      darkTheme: _themeService.darkTheme,
+      themeMode: _themeService.isDarkMode ? ThemeMode.dark : ThemeMode.light,
       home: const LoginScreen(),
     );
   }

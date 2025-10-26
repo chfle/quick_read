@@ -250,17 +250,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
   Widget _buildFilterOption(String label, String value, IconData icon) {
     final isSelected = _filter == value;
-    
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return ListTile(
       leading: Icon(
         icon,
-        color: isSelected ? Colors.blue : Colors.grey[700],
+        color: isSelected ? Colors.blue : (isDark ? Colors.grey[400] : Colors.grey[700]),
       ),
       title: Text(
         label,
         style: TextStyle(
           fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-          color: isSelected ? Colors.blue : Colors.black87,
+          color: isSelected ? Colors.blue : null,
         ),
       ),
       trailing: isSelected
@@ -321,12 +322,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: const Text('Reading History'),
-        backgroundColor: Colors.blue,
-        foregroundColor: Colors.white,
-        elevation: 0,
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -346,7 +343,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(16),
-              color: Colors.white,
+              color: Theme.of(context).cardColor,
               child: Wrap(
                 spacing: 8,
                 children: [
@@ -381,6 +378,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
     final filteredItems = _filteredHistory;
 
     if (filteredItems.isEmpty) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
       return Center(
         child: Padding(
           padding: const EdgeInsets.all(32),
@@ -390,12 +388,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
               Icon(
                 Icons.history,
                 size: 100,
-                color: Colors.grey[300],
+                color: isDark ? Colors.grey[700] : Colors.grey[300],
               ),
               const SizedBox(height: 24),
               Text(
-                _filter == 'all' 
-                    ? 'No Reading History' 
+                _filter == 'all'
+                    ? 'No Reading History'
                     : 'No Articles Read',
                 style: const TextStyle(
                   fontSize: 22,
@@ -410,7 +408,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     : 'No articles read during this period',
                 style: TextStyle(
                   fontSize: 15,
-                  color: Colors.grey[600],
+                  color: isDark ? Colors.grey[400] : Colors.grey[600],
                   height: 1.5,
                 ),
                 textAlign: TextAlign.center,
